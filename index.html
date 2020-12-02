@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>addfavor.html</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous"><!--BS4-->
+    <link rel="stylesheet" href="reset.css">
+    <link rel="stylesheet" href="all.css">
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.common.dev.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.common.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/core.js'></script>
+</head>
+<style lang="scss">
+    @import url("https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.4.1/css/bootstrap.min.css");
+    @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css");
+
+    $colors:(
+      "aqi1": #7bed9f,
+      "aqi2": #ffff00,
+      "aqi3": #ff7e00,
+      "aqi4": #ff0000,
+      "aqi5": #8f3f97,
+      "aqi6": #7e0023,
+      "aqi7": #bdc3c7,
+    );
+
+    @each $key, $val in $colors {
+      .status-#{$key} {
+        background-color: $val;
+      }
+    }
+</style>
+<body>
+    <div id="app">
+        <select name="" id="" class="form-control mb-3" v-model="filter">
+          <option value="all"
+
+          >--- 所有城市 ---</option>
+          <option v-for="item in location" :value="item">{{item}}</option>
+        </select>
+        <div>
+          <h4 class="ml-4">關注城市</h4>
+          <div class="container-fluid">
+            <div class="row">
+              <card v-for="(item, key) in stared" :raw-data="item" :key="key">
+                <template #stared><a href="#" class="float-right" @click.prevent="unStar(item)"><i class="fas fa-star"></i></a></template>
+              </card>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <div class="container-fluid">
+          <div class="row">
+            <card v-for="(item, key) in filterLocation" :raw-data="item" :key="key" @stared="toStar"></card>
+          </div>
+        </div>
+      </div>
+      
+      <script type="text/x-template" id="card">
+        <div class="col-4 mb-3">
+          <div class="card" :class="getStyle">
+            <div class="card-header">{{ rawData.County }} - {{ rawData.SiteName }}
+              <slot name="stared"><a href="#" class="float-right" @click.prevent="stared"><i class="far fa-star"></i></a></slot>
+            </div>
+            <div class="card-body">
+              <ul class="list-unstyled">
+                <li>AQI 指數: {{ rawData.AQI }}</li>
+                <li>PM2.5: {{ rawData["PM2.5"] }}</li>
+                <li>說明: {{ rawData.Status }}</li>
+              </ul>
+            {{ rawData.PublishTime }}
+            </div>
+          </div>
+        </div>
+</script>
+
+<script>
+
+  Vue.component('card',{
+  props:['rawData'],
+  template: '#card',
+  methods: {
+    stared() {
+      this.$emit('stared', this.rawData)
+    }
+  },
+  computed: {
+    getStyle() {
+      const vm = this;
+      switch (vm.rawData.Status) {
+        case '良好' :
+          return 'status-aqi1';
+          break;
+        case '普通' :
+          return 'status-aqi2';
+          break;
+        case '對敏感族群不健康' :
+          return 'status-aqi3';
+          break;
+        case '對所有族群不健康' :
+          return 'status-aqi4';
+          break;
+        case '非常不健康' :
+          return 'status-aqi5';
+          break;
+        case '危害' :
+          return 'status-aqi6';
+          break;
+        case '設備維護' :
+          return 'status-aqi7';
+          break;
+      }
+    }
+  },
+})
+</script>
+<script>
+var app = new Vue({
+  el: '#app',
+  data: {
+    data: [],
+    location: [],
+    localStorageList: JSON.parse(localStorage.getItem('list')) || [],
+    stared: [],
+    filter: 'all',
+    API:'https://script.google.com/macros/s/AKfycbzl6KKgb4v2-F3SCVxVaXjnMwM_XQvnk2A08nw7NjmGfuRVmak0/exec?url=http://opendata2.epa.gov.tw/AQI.json'
+  },
+  mounted() {//fetch的固定寫法:https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+    const vm = this;
+    fetch(vm.API)
+    .then((res)=>{return res.json()})
+    .then((result) => { 
+      vm.data = result;
+      this.sortLocal(result);
+      this.getLocal();
+      })
+
+  },
+  methods: {
+    sortLocal(result) {
+      const vm = this;
+      let localList = [];
+      for (let i=0; i<vm.data.length; i++) {
+        localList.push(vm.data[i].County);
+      };
+      localList.forEach(el => {
+        if(vm.location.indexOf(el) === -1) {
+          vm.location.push(el)
+        }
+      });
+    },
+    toStar(data) {
+      const vm = this;
+      vm.stared.push(data);
+      this.setLocal(data)
+    },
+    unStar(data) {
+      const vm = this;
+      let index = vm.stared.indexOf(data);
+      vm.stared.splice(index, 1);
+      this.remove(data);
+    },
+    setLocal(data) {
+      const vm = this;
+      let temp = vm.localStorageList;
+      if (temp.indexOf(data.SiteName) === -1){
+        temp.push(data.SiteName)
+      }
+      localStorage.setItem('list',JSON.stringify(temp));
+      temp = [];
+    },
+    remove(data) {
+      const vm = this;
+      let temp = vm.localStorageList;
+      let index = temp.indexOf(data.SiteName);
+      temp.splice(index, 1);
+      localStorage.setItem('list',JSON.stringify(temp));
+      temp = [];
+    },
+    getLocal() {
+      const vm = this;
+      vm.stared = vm.data.filter(el => {
+        return vm.localStorageList.some(item => {
+          return el.SiteName === item //
+        })
+      })
+    }
+  },
+  computed: {
+    filterLocation() {
+      const vm = this;
+      if (vm.filter === 'all') {
+        return vm.data.filter(el => {
+          return vm.stared.indexOf(el) === -1
+
+        })
+      }
+      if (vm.filter !== '') {
+        return vm.data.filter(el => {
+          if (el.County === vm.filter) {
+            return vm.stared.indexOf(el) === -1;
+          }
+        })
+      }  
+    }
+
+  }
+});
+
+        </script>
+</body>
+</html>
